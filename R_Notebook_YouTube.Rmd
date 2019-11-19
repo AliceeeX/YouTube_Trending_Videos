@@ -1,0 +1,197 @@
+---
+title: "Youtube Video"
+author: Chuyue Xie
+output: 
+    html_notebook:
+    fig_height: 6
+    fig_width: 10
+---
+# Motivation
+YouTube has become one of the most popular worldwide video sharing platform nowadays. It includes videos varying from music videos to makeup tutorials, from lifestyle vlog to education videos... YouTube seem be be a hub of creativity and informations. The main purpose of this project is to explore the following questions:
+1. What is the most popular comment for the top trending videos in the United States?
+2. Is there any difference in people's favor in terms of video types among the United States and korea?
+
+# Data Source
+For this project, the dataset used is found at Kaggle published by Mitchell J, a software developer at Backbeat Technologies. The version this project based on is version 115. The following is a weblink to the Kaggle page of the dataset: [Trending YouTube Video Statistics](https://www.kaggle.com/datasnaek/youtube-new). The main dataset used in this project are *USvideos.csv* and *KRvideos.csv*.
+
+# Set Up
+
+### Clean up environment and load packages
+```{r message=FALSE, paged.print=FALSE}
+# clean up the RStudio environment 
+rm(list = ls())
+
+# load all packages here: `mosaic`, `tidyverse`, `lubridate`, and all others used
+library(mosaic)
+library(tidyverse)
+library(lubridate)
+library(DataComputing)
+library(ggplot2)
+library(rjson)
+```
+
+### Data Intake
+The codes below read in data tables from csv files.
+```{r message=FALSE, warning=FALSE}
+### Load US videos data from USvideos.csv
+US_data <- read_csv("USvideos.csv") #full data with 40949 rows
+US_sub_data <- # small data with 10k rows
+  US_data %>%
+  head(10000)
+### Load Korean videos data from KRvideos.csv
+KR_data <- read_csv("KRvideos.csv") #full data with 34567 rows
+KR_sub_data <- # small data with 10k rows
+  KR_data %>%
+  head(10000)
+### Read in the table that includes meaning of each category
+US_category_table <- fromJSON(file = "US_category_id.json") #table of category value for US
+KR_category_table <- fromJSON(file = "KR_category_id.json") #table of category value for Korea
+```
+
+### Data Table Inspection
+To start with, the main table with video information for US and korea is shown below:
+```{r include=FALSE, paged.print=FALSE}
+### US videos dataset
+US_sub_data %>%
+  glimpse() #the glimpse function will present the columns down the page and rows across
+
+### Korean videos dataset
+KR_sub_data %>%
+  glimpse()
+
+### US category datatable
+print("US category datatable")
+US_category_table %>%
+  glimpse()
+
+### Korea category datatable
+print("Korea category datatable")
+KR_category_table %>%
+  glimpse()
+```
+According to the output, there are 16 variables in total for both video datasets. This includes video id, trending date (chr), title (chr), channel title (chr), category id (dbl), publish time (dttm), tags (chr), views (dbl), likes (dbl), dislikes (dbl), comment count (dbl), thumbnail link (chr), comments disabled (lgl), ratings disabled (lgl), and video error or removed (lgl), and description (chr). 
+
+Moreover, for the category datasets, it they look a little messy. There are a 32 levels for US category datasets and 31 levels for the Korea category dataset. Further cleaning of the data table will be conducted in later steps.
+
+In order to decrease the dimension of the tables and prepare it for further analysis, the next step is to transform variable type and clean the data table.
+
+### Data Preprocessing
+
+In this project, the main focus will be place on variables including video id, trending date, channel title, category id, publish time, views, liks, dislikes, comments, ratings, video error or removed, and description for US data. For the korea videos data, only video id, trending date, category id, publish time, and views will be used in this project. Other variables will be revoved.
+
+```{r}
+### Select variables for the US dataset
+US_sub_data <-
+  US_sub_data %>%
+  select(video_id, trending_date, channel_title, category_id, category_id, publish_time, views, likes, dislikes, comment_count, ratings_disabled, video_error_or_removed, description) 
+### Select variables for the korea dataset
+KR_sub_data <-
+  KR_sub_data %>%
+  select(video_id, trending_date, category_id, publish_time, views)
+```
+
+Notice that trending date and category id are not in the right form. Trending date should be a time variable, but is recognized as a character string. Moreover, category id should be a character string, but is recognized as a number. In the next step, variables trending date and category id are converted into the correct format.
+
+```{r}
+### Convert variables for the US video dataset
+US_sub_data <-
+  US_sub_data %>%
+  mutate(trending_date = ydm(trending_date), category_id = as.character(category_id))
+### Convert variables for the korea video dataset
+KR_sub_data <-
+  KR_sub_data %>%
+  mutate(trending_date = ydm(trending_date), category_id = as.character(category_id))
+```
+
+For the original dataset, the category id variable is named as numbers. In order to give it more meanings, it is transformed into real video category names for furhter analysis.
+
+```{r}
+#Step 1: Use the US category table fo create a table for category id&name conversion
+id <- rep(c(0), 32) #ccreate a string with length 32 with values equal to 0
+name <- rep(c(0), 32) #create a string with length 32 with values equal to 0
+
+### Use US category table to define id and their corresponding movie category name
+for (i in 1:32){
+  id[i] = US_category_table$items[[i]]$id
+  name[i] = US_category_table$items[[i]]$snippet$title
+}
+
+### Create a new table that contain the name of each category id
+category_name_US <- 
+  list(category_id = id, category_name = name) %>%
+  as.data.frame()
+
+
+#Step 2: Use the KR category table fo create a table for category id&name conversion
+id_KR <- rep(c(0), 31) #ccreate a string with length 32 with values equal to 0
+name_KR <- rep(c(0), 31) #create a string with length 32 with values equal to 0
+### Use US category table to define id and their corresponding movie category name
+for (i in 1:31){
+  id_KR[i] = KR_category_table$items[[i]]$id
+  name_KR[i] = KR_category_table$items[[i]]$snippet$title
+}
+
+### Create a new table that contain the name of each category id
+category_name_KR <- 
+  list(category_id = id, category_name = name) %>%
+  as.data.frame()
+
+# Step 3: Join the US and KR video tables with the category name tables.
+### US videos data
+US_sub_data <-
+  US_sub_data %>%
+  left_join(category_name_US)
+
+### Korea videos data
+KR_sub_data <-
+  KR_sub_data %>%
+  left_join(category_name_KR)
+```
+
+The following will show the first few rows of the data to demonstrate the data used in further sections.
+```{r}
+### US videos data
+US_sub_data %>%
+  tail()
+
+### Korea videos data
+KR_sub_data %>%
+  head()
+```
+
+# Section: How long it takes for a video to become popular
+In this section, 
+```{r}
+US_sub_data %>%
+  group_by(video_id) %>%
+  summarise(count = n())
+```
+
+
+
+# Section: Most Popular video category across time
+In this section, the most popular video category among time in the United States and Korea is compared. 
+```{r}
+US_sub_data %>%
+  group_by(category_name) %>%
+  summarise(count = n())%>%
+  arrange(desc(count)) %>%
+  head(5)
+```
+
+```{r}
+Top_5_category <-
+  US_sub_data %>%
+  group_by(trending_date, category_name) %>%
+  summarise(count = n()) %>%
+  filter(category_name %in% c("Entertainment", "Music", "Comedy", "Howto & Style", "People & Blogs"))
+Top_5_category %>%
+  ggplot(aes(x = trending_date, y = count, group = category_name)) +
+  geom_line(size = 1, alpha = 0.7, aes(color = category_name))+
+  xlab("Date") +
+  ylab("Popularity")
+```
+
+
+
+# Section: Most Popular Comment
