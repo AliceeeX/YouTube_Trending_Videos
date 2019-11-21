@@ -4,7 +4,7 @@ author: Chuyue Xie
 output: 
     html_notebook:
     fig_height: 6
-    fig_width: 10
+    fig_width: 12
 ---
 # Motivation
 YouTube has become one of the most popular worldwide video sharing platform nowadays. It includes videos varying from music videos to makeup tutorials, from lifestyle vlog to education videos... YouTube seem be be a hub of creativity and informations. The main purpose of this project is to explore the following questions:
@@ -52,11 +52,11 @@ KR_category_table <- fromJSON(file = "KR_category_id.json") #table of category v
 To start with, the main table with video information for US and korea is shown below:
 ```{r include=FALSE, paged.print=FALSE}
 ### US videos dataset
-US_sub_data %>%
+US_data %>%
   glimpse() #the glimpse function will present the columns down the page and rows across
 
 ### Korean videos dataset
-KR_sub_data %>%
+KR_data %>%
   glimpse()
 
 ### US category datatable
@@ -77,16 +77,16 @@ In order to decrease the dimension of the tables and prepare it for further anal
 
 ### Data Preprocessing
 
-In this project, the main focus will be place on variables including video id, trending date, channel title, category id, publish time, views, liks, dislikes, comments, ratings, video error or removed, and description for US data. For the korea videos data, only video id, trending date, category id, publish time, and views will be used in this project. Other variables will be revoved.
+In this project, the main focus will be place on variables including video id, trending date, channel title, category id, publish time, views, liks, dislikes, and description for US data. For the korea videos data, only video id, trending date, category id, publish time, and views will be used in this project. Other variables will be revoved.
 
 ```{r}
 ### Select variables for the US dataset
-US_sub_data <-
-  US_sub_data %>%
-  select(video_id, trending_date, channel_title, category_id, category_id, publish_time, views, likes, dislikes, comment_count, ratings_disabled, video_error_or_removed, description) 
+US_data <-
+  US_data %>%
+  select(video_id, trending_date, title, channel_title, category_id, category_id, publish_time, views, likes, dislikes) 
 ### Select variables for the korea dataset
-KR_sub_data <-
-  KR_sub_data %>%
+KR_data <-
+  KR_data %>%
   select(video_id, trending_date, category_id, publish_time, views)
 ```
 
@@ -94,12 +94,12 @@ Notice that trending date and category id are not in the right form. Trending da
 
 ```{r}
 ### Convert variables for the US video dataset
-US_sub_data <-
-  US_sub_data %>%
+US_data <-
+  US_data %>%
   mutate(trending_date = ydm(trending_date), category_id = as.character(category_id))
 ### Convert variables for the korea video dataset
-KR_sub_data <-
-  KR_sub_data %>%
+KR_data <-
+  KR_data %>%
   mutate(trending_date = ydm(trending_date), category_id = as.character(category_id))
 ```
 
@@ -138,60 +138,200 @@ category_name_KR <-
 
 # Step 3: Join the US and KR video tables with the category name tables.
 ### US videos data
-US_sub_data <-
-  US_sub_data %>%
+US_data <-
+  US_data %>%
   left_join(category_name_US)
 
 ### Korea videos data
-KR_sub_data <-
-  KR_sub_data %>%
+KR_data <-
+  KR_data %>%
   left_join(category_name_KR)
 ```
 
 The following will show the first few rows of the data to demonstrate the data used in further sections.
 ```{r}
 ### US videos data
-US_sub_data %>%
+US_data %>%
   tail()
 
 ### Korea videos data
-KR_sub_data %>%
+KR_data %>%
   head()
 ```
 
-# Section: How long it takes for a video to become popular
-In this section, 
-```{r}
-US_sub_data %>%
-  group_by(video_id) %>%
-  summarise(count = n())
-```
-
-
-
-# Section: Most Popular video category across time
+# Section: Most popular trending video category across time
 In this section, the most popular video category among time in the United States and Korea is compared. 
+
+### Step 1: Find the 3 most popular categories for US and Korea
 ```{r}
-US_sub_data %>%
+### 5 Most Popular Categories for US
+US_data %>%
   group_by(category_name) %>%
   summarise(count = n())%>%
   arrange(desc(count)) %>%
-  head(5)
+  head(3)
+
+### 5 Most Popular Categories for Korea
+KR_data %>%
+  group_by(category_name) %>%
+  summarise(count = n())%>%
+  arrange(desc(count)) %>%
+  head(3)
+```
+According to the two tables, among all trending videos, Entertainment videos is the most common for both countries. Moreover, Music and Howto & Style videos appears to be more common in the US while videos about news and politics as well as People & Blogs appear to be more common among trending videos on YouTube in Korea.
+
+### Step 2: Exploratory Data Analysis
+Visualization will help to understand this result better. 
+```{r}
+### list of most popular videos
+popular_cate_US <- c("Entertainment", "Music", "Howto & Style")
+popular_cate_KR <- c("Entertainment", "People & Blogs", "News & Politics")
+
+### Define Top categories table of the US
+Top_5_category_US <-
+  US_data %>%
+  group_by(trending_date) %>%
+  mutate(day_count = n()) %>%
+  group_by(trending_date, category_name) %>%
+  mutate(cate_count = n(), percent = cate_count / day_count) %>%
+  filter(category_name %in% popular_cate_US) %>%
+  mutate(country = "US")
+
+### Define Top categories table of the Korea
+Top_5_category_KR <-
+  KR_data %>%  
+  group_by(trending_date) %>%
+  mutate(day_count = n()) %>%
+  group_by(trending_date, category_name) %>%
+  mutate(cate_count = n(), percent = cate_count / day_count) %>%
+  filter(category_name %in% popular_cate_KR) %>%
+  mutate(country = "KR")
+
+### Join the two tables and transform it into wide table
+Top_5_category <-
+  rbind(Top_5_category_US, Top_5_category_KR)
+  
+#Top_5_category_US %>%
+#  ggplot(aes(x = trending_date, y = percent, group = category_name)) +
+#  geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))
+
+#Top_5_category_KR %>%
+#  ggplot(aes(x = trending_date, y = percent, group = category_name)) +
+#  geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))
+
+Top_5_category %>%
+  ggplot(aes(x = trending_date, y = percent, group = category_name)) +
+  geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))+
+  facet_grid(country ~.)
+
+```
+
+According to the plot, the differences in most common categories of trending videos between US and Korea seem appearant. Similar to our observation above, the plot shows that overall, the most common video categories in Korea is Entertainment, News & Politics, and Peopl & Blogs, while in US is Entertainment, Music, and Howto & Styles. 
+
+However, it also shows the change among time. In the subplot for Korea, the percent of count for Entertainment, News & Politics, and Peopl & Blogs started with similar values. However, by the middle of June, there is an increase trend in Entertainment videos percent count. Also, there is a decreasing pattern in People & Blog videos percent count since the beginning of June. 
+
+For the US youtube videos, the Entertainment category appears to relatively stable and take around 25% of all videos. However, the music category boosted in November, December, May, and June, which make match the time of winter and summer breaks.
+
+
+# Section: Monthly Trending "Title Phrase"
+
+YouTubers always want to get most viewers' attention by making effort in the video titles. In the following analysis, the main purpose is to understand which are the most commonly used phrases among trending YouTube videos. More importantly, how does the use of vocabulary change over time. This analysis will be based on the US dataset.
+
+In order to analysis the montly trend, the dataset will need to be splitted into monthly pieces. Then, the title should be splitted into words and add up the counts of each word used in the dataset.
+
+### Step 1: Word Count Function
+
+In order to count the word-use frequency, the following function is constructed below to help with separating the title into vocabularies, removing punctuations, and count the amount of word altogether.
+
+```{r}
+word_count <- function(variable){
+  variable <- gsub('[[:punct:] ]+',' ',variable) ### remove punctuation
+  list <- c() ### empty vector
+  num <- c() ### empty vector
+  for (i in 1:length(variable)){
+    string <- variable[i]
+    #print(string)
+    words <- tolower(unlist(strsplit(string, " "))) ###split the title string
+    #print(words)
+    for (j in 1:length(words)){
+      #print(j)
+      position <- match(words[j], list) ###define the position of the vocab in list
+      list_length <- length(list) ###calculate the length of list
+      num_len <- length(num) ### calculate the length of number
+      if (is.na(position) == FALSE){ ### if item in the list
+        num[position] <- num[position]+1 ### add a count to the vocab
+      }
+      else{ ### ekse if vocab not in the list
+        list[list_length+1] = words[j] ###create a new row in list
+        num[num_len+1] = 1 ### setnumber of elements to 1 for that vocab
+      }
+    }
+  }
+  df <- data.frame(list = list, num = num) ### create a dataframe that combine the list of vocab and their count
+  return(df)
+}
+```
+
+### Step 2: Data Preprocess
+```{r}
+title_col <- US$
+```
+
+
+```{r}
+test <- US_data %>%
+  head(100)
+col <- as.vector(US_data$title)
+word_count(col) %>%
+  arrange(desc(num))
 ```
 
 ```{r}
-Top_5_category <-
-  US_sub_data %>%
-  group_by(trending_date, category_name) %>%
+### List of popular preposition and pronouns that have no actual meaning
+prep_n_pron <- "(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|thisup|by|his|off)"
+
+### List of most popular words
+pattern <- "(official|2017|2018|ft|how|christmas|trailer|live|audio)"
+US_data %>%
+  filter(grepl(pattern = pattern, ignore.case = TRUE, title)) %>%
+  tidyr::extract(title, into = "pattern", regex = pattern) %>%
+  group_by(category_name, pattern) %>%
+  na.omit() %>%
   summarise(count = n()) %>%
-  filter(category_name %in% c("Entertainment", "Music", "Comedy", "Howto & Style", "People & Blogs"))
-Top_5_category %>%
-  ggplot(aes(x = trending_date, y = count, group = category_name)) +
-  geom_line(size = 1, alpha = 0.7, aes(color = category_name))+
-  xlab("Date") +
-  ylab("Popularity")
+  arrange(desc(count)) #%>%
+#  ggplot(aes(x = year, y = category_name)) +
+#  geom_point(aes(size = count, color = pattern))
 ```
 
 
+# Section: Time takes for a video to become popular
 
-# Section: Most Popular Comment
+```{r warning=FALSE}
+### US data
+Summary_Stats <-
+  US_data %>%
+  select(video_id, publish_time, trending_date, category_name) %>%
+  mutate(publish_time = as.Date(publish_time)) %>%
+  group_by(video_id) %>%
+  mutate(first_trending_date = min(trending_date), days_to_trending = interval(publish_time, first_trending_date)/86400)
+```
+
+
+```{r}
+Summary_Stats %>%
+  group_by(category_name) %>%
+  mutate(mean_days = mean(days_to_trending), se = sd(days_to_trending)/sqrt(n())) %>%
+  mutate(top = mean_days + 2*se, bottom = mean_days - 2 * se) %>%
+  ggplot(aes(x = category_name, y = days_to_trending)) +
+  geom_bar(data = Summary_Stats, stat = "identity", alpha = 0.2 ) +
+  geom_errorbar(aes(x = category_name, ymax = top, ymin = bottom))#+
+#  ylim(c(0,90))
+
+```
+
+```{r}
+KR_data %>%
+ select(category_name, trending_date, video_id) %>%
+ filter(trending_date == ymd(20180328))
+
+```
