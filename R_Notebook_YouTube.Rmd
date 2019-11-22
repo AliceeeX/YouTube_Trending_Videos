@@ -12,7 +12,7 @@ YouTube has become one of the most popular worldwide video sharing platform nowa
 2. Is there any difference in people's favor in terms of video types among the United States and korea?
 
 # Data Source
-For this project, the dataset used is found at Kaggle published by Mitchell J, a software developer at Backbeat Technologies. The version this project based on is version 115. The following is a weblink to the Kaggle page of the dataset: [Trending YouTube Video Statistics](https://www.kaggle.com/datasnaek/youtube-new). The main dataset used in this project are *USvideos.csv* and *KRvideos.csv*.
+For this project, the dataset used is found at Kaggle published by Mitchell J, a software developer at Backbeat Technologies. The version this project based on is version 115. The following is a weblink to the Kaggle page of the dataset: [Trending YouTube Video Statistics](https://www.kaggle.com/datasnaek/youtube-new). The main dataset used in this project are *USvideos.csv*. Other supporting datasets are *KRvideos.csv*, *US_category_id.json*, *KR_category_id.json*, and 
 
 # Set Up
 
@@ -398,21 +398,51 @@ Vocab_Count %>%
 According to the plot, the most popular words used in the videos overall is "official". Words such as 2017 and 2018 are used more often by the end of and at the beggining of each year. Moreover, in December, wehn Chirstmas is about to come, the word "Christmas" also become very common in video titles. 
 
 ```{r}
-popular_cate_US <- c("Entertainment", "Music", "Howto & Style", "Comedy", "People & Blogs")
+popular_cate_US <- c("Entertainment")
 ### List of most popular words
 pattern <- "(official|2017|2018|chistmas|how|music|new|super|trailer|video|vs|bowl)"
 US_data %>%
   filter(grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-  group_by(trending_date, category_name) %>%
-  mutate(likes = mean(likes), dislikes = mean(dislikes), views = mean(views)) %>%
-  gather(key = type, value = num, views, likes, dislikes) %>%
-  ggplot(aes(x = trending_date, y = num, color = type)) +
-  geom_point()+
-  stat_smooth() + 
-  facet_grid(.~category_name)
-  
+  mutate(case = "With Pattern") %>%
+  rbind(
+    US_data %>%
+      filter(!grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
+      mutate(case = "Without Pattern")
+  ) %>%
+  group_by(trending_date, category_name, case) %>%
+  summarise(mean_views = mean(views), se = sd(views)/sqrt(n())) %>%
+  #mutate(top = mean_views + 2*se, bottom = mean_views - 2 * se) %>%
+  ggplot(aes(x = trending_date, y = mean_views, color = case)) +
+  geom_point(alpha = 0.6)+
+  geom_line(alpha = 0.6)
 ```
 
+This plot shows that in general, videos with at least one of the vocabularies (official, 2017, 2018, chistmas, how, music, new, super, trailer, video, vs, bowl) in the tile has higher mean views than videos without the vocaularies. This is especially obvious in December, and after middle March. In order to state with more confidence whether this difference is significant, error bars will be plotted for each day.
+
+```{r}
+popular_cate_US <- c("Entertainment")
+### List of most popular words
+pattern <- "(official|2017|2018|chistmas|how|music|new|super|trailer|video|vs|bowl)"
+US_data %>%
+  filter(grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
+  mutate(case = "With Pattern") %>%
+  rbind(
+    US_data %>%
+      filter(!grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
+      mutate(case = "Without Pattern")
+  ) %>%
+  group_by(trending_date, category_name, case) %>%
+  summarise(mean_views = mean(views), se = sd(views)/sqrt(n())) %>%
+  mutate(top = mean_views + 1.5* se, bottom = mean_views - 1.5 * se) %>%
+  ggplot(aes(x = trending_date, y = mean_views, color = case)) +
+  geom_point(size = 0.5) + 
+  geom_line(size = 0.5)+
+  geom_errorbar(aes(x = trending_date, ymin = bottom, ymax = top), alpha = 0.6)+
+  ylab("Views") +
+  xlab("Date")
+```
+
+In this plot, each vertical line indicates 93.3% confidence interval bands. It is interesting to see that although YouTube videos with the patterns have higher average views, the variance for these videos are larger than the videos without the patterns. This result in overlaping confidence intervals for most of the time, which lead to lack of significance to conclude that videos with pattern will have higher views on average. However, for some period from late April to early June, the difference bettwen views of videos with pattern in title appears to be significant different from the ones without the pattern. 
 
 # Section: Time takes for a video to become popular
 
