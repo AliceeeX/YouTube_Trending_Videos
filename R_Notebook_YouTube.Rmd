@@ -152,7 +152,7 @@ The following will show the first few rows of the data to demonstrate the data u
 ```{r}
 ### US videos data
 US_data %>%
-  tail()
+  head()
 
 ### Korea videos data
 KR_data %>%
@@ -188,6 +188,36 @@ popular_cate_US <- c("Entertainment", "Music", "Howto & Style")
 popular_cate_KR <- c("Entertainment", "People & Blogs", "News & Politics")
 
 ### Define Top categories table of the US
+Top_5_category_US_count <-
+  US_data %>%
+  group_by(trending_date, category_name) %>%
+  mutate(count = n()) %>%
+  filter(category_name %in% popular_cate_US) %>%
+  mutate(country = "US")
+
+### Define Top categories table of the Korea
+Top_5_category_KR_count <-
+  KR_data %>%  
+  group_by(trending_date, category_name) %>%
+  mutate(count = n()) %>%
+  filter(category_name %in% popular_cate_KR) %>%
+  mutate(country = "KR")
+
+### Join the two tables and transform it into wide table
+Top_5_category_count <-
+  rbind(Top_5_category_US_count, Top_5_category_KR_count)
+
+### Plot the graph
+Top_5_category_count %>%
+  ggplot(aes(x = trending_date, y = count, group = category_name)) +
+  geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))+
+  facet_grid(country ~.)
+```
+
+This plot demonstrates the change in count for top 3 categories of each country from Nov 2018 to June 2019. However, since the daily total video counts are different, the distribution among time may not be shown accurately in this plot. In order to improve this, a daily percent plot for each category is plotted below.
+
+```{r}
+### Define Top categories table of the US
 Top_5_category_US <-
   US_data %>%
   group_by(trending_date) %>%
@@ -210,15 +240,8 @@ Top_5_category_KR <-
 ### Join the two tables and transform it into wide table
 Top_5_category <-
   rbind(Top_5_category_US, Top_5_category_KR)
-  
-#Top_5_category_US %>%
-#  ggplot(aes(x = trending_date, y = percent, group = category_name)) +
-#  geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))
 
-#Top_5_category_KR %>%
-#  ggplot(aes(x = trending_date, y = percent, group = category_name)) +
-#  geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))
-
+### Plot the graph
 Top_5_category %>%
   ggplot(aes(x = trending_date, y = percent, group = category_name)) +
   geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))+
@@ -351,34 +374,43 @@ Vocab_Count <-
 Vocab_Count
 ```
 
+### Step 4: Data Visualization
+
+Next, a plot showing how top 5 popular vocabularies of each month change from November 2018 to June 2019 is plotted.
 
 ```{r}
 ### List of popular preposition and pronouns that have no actual meaning
-prep_n_pron <- "(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off)"
-
 prep_n_pron <- "^(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off)$"
 
-#prep_n_pron <- c("the","a","s","at","to","of","with","in","on","and","i","you","for","is","am","are","my","it","ft","from","your","this","the","up","by","his","off")
-
+### remove these from the list of popular words
 Vocab_Count %>%
-#  filter(list %in% prep_n_pron)
-   filter(grepl(prep_n_pron, list))
+  filter(!grepl(prep_n_pron, list)) %>%
+  group_by(month) %>%
+  top_n(5, num) %>%
+  ggplot(aes(x = month, y = num))+
+  #geom_point(aes(color = list), size = 2, alpha = 0.5)+
+  geom_text(aes(label=list, color = list), angle = 45, alpha = 0.8, nudge_y =1) +
+  xlim(c("Nov", "Dec", "Jan", "Feb", "Mar", "April", "May", "June"))+
+  ylab("count")
 
 ```
 
-```{r}
+According to the plot, the most popular words used in the videos overall is "official". Words such as 2017 and 2018 are used more often by the end of and at the beggining of each year. Moreover, in December, wehn Chirstmas is about to come, the word "Christmas" also become very common in video titles. 
 
+```{r}
+popular_cate_US <- c("Entertainment", "Music", "Howto & Style", "Comedy", "People & Blogs")
 ### List of most popular words
-pattern <- "(official|2017|2018|ft|how|christmas|trailer|live|audio)"
+pattern <- "(official|2017|2018|chistmas|how|music|new|super|trailer|video|vs|bowl)"
 US_data %>%
-  filter(grepl(pattern = pattern, ignore.case = TRUE, title)) %>%
-  tidyr::extract(title, into = "pattern", regex = pattern) %>%
-  group_by(category_name, pattern) %>%
-  na.omit() %>%
-  summarise(count = n()) %>%
-  arrange(desc(count)) #%>%
-#  ggplot(aes(x = year, y = category_name)) +
-#  geom_point(aes(size = count, color = pattern))
+  filter(grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
+  group_by(trending_date, category_name) %>%
+  mutate(likes = mean(likes), dislikes = mean(dislikes), views = mean(views)) %>%
+  gather(key = type, value = num, views, likes, dislikes) %>%
+  ggplot(aes(x = trending_date, y = num, color = type)) +
+  geom_point()+
+  stat_smooth() + 
+  facet_grid(.~category_name)
+  
 ```
 
 
