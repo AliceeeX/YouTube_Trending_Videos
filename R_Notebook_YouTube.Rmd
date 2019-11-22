@@ -237,7 +237,7 @@ For the US youtube videos, the Entertainment category appears to relatively stab
 
 YouTubers always want to get most viewers' attention by making effort in the video titles. In the following analysis, the main purpose is to understand which are the most commonly used phrases among trending YouTube videos. More importantly, how does the use of vocabulary change over time. This analysis will be based on the US dataset.
 
-In order to analysis the montly trend, the dataset will need to be splitted into monthly pieces. Then, the title should be splitted into words and add up the counts of each word used in the dataset.
+In order to analysis the montly trend, the dataset will need to be splitted into monthly pieces. Moreover, the title string should be splitted into individual words, which adds up to counts for each vocabulary. The following steps demonstrate this process.
 
 ### Step 1: Word Count Function
 
@@ -272,23 +272,101 @@ word_count <- function(variable){
 }
 ```
 
-### Step 2: Data Preprocess
+### Step 2: Data Preprocessing
+In this step, the entire US dataset is splitted into 8 pieces from November to June
 ```{r}
-title_col <- US$
+Nov <- US_data %>%
+  mutate(trending_date = month(trending_date)) %>%
+  filter(trending_date == 11)
+Dec <- US_data %>%
+  mutate(trending_date = month(trending_date)) %>%
+  filter(trending_date == 12)
+Jan <- US_data %>%
+  mutate(trending_date = month(trending_date)) %>%
+  filter(trending_date == 1)
+Feb <- US_data %>%
+  mutate(trending_date = month(trending_date)) %>%
+  filter(trending_date == 2)
+Mar <- US_data %>%
+  mutate(trending_date = month(trending_date)) %>%
+  filter(trending_date == 3)
+April <- US_data %>%
+  mutate(trending_date = month(trending_date)) %>%
+  filter(trending_date == 4)
+May <- US_data %>%
+  mutate(trending_date = month(trending_date)) %>%
+  filter(trending_date == 5)
+June <- US_data %>%
+  mutate(trending_date = month(trending_date)) %>%
+  filter(trending_date == 6)
 ```
 
-
+### Step 3: Word Count for Each Month
+Then, the vocab function is applied to each month's data. The result will be the trending vocab in video titles.
 ```{r}
-test <- US_data %>%
-  head(100)
-col <- as.vector(US_data$title)
-word_count(col) %>%
-  arrange(desc(num))
+Nov_title <- as.vector(Nov$title)
+Nov_vocab <- word_count(Nov_title) %>%
+  arrange(desc(num)) %>%
+  mutate(month = "Nov")
+
+Dec_title <- as.vector(Dec$title)
+Dec_vocab <- word_count(Dec_title) %>%
+  arrange(desc(num)) %>%
+  mutate(month = "Dec")
+
+Jan_title <- as.vector(Jan$title)
+Jan_vocab <- word_count(Jan_title) %>%
+  arrange(desc(num))%>%
+  mutate(month = "Jan")
+
+Feb_title <- as.vector(Feb$title)
+Feb_vocab <- word_count(Feb_title) %>%
+  arrange(desc(num))%>%
+  mutate(month = "Feb")
+
+Mar_title <- as.vector(Mar$title)
+Mar_vocab <- word_count(Mar_title) %>%
+  arrange(desc(num))%>%
+  mutate(month = "Mar")
+
+April_title <- as.vector(April$title)
+April_vocab <- word_count(April_title) %>%
+  arrange(desc(num))%>%
+  mutate(month = "April")
+
+May_title <- as.vector(May$title)
+May_vocab <- word_count(May_title) %>%
+  arrange(desc(num))%>%
+  mutate(month = "May")
+
+June_title <- as.vector(June$title)
+June_vocab <- word_count(June_title) %>%
+  arrange(desc(num))%>%
+  mutate(month = "June")
 ```
+These tables are binded together for further analysis.
+```{r}
+Vocab_Count <-
+  rbind(Nov_vocab, Dec_vocab, Jan_vocab, Feb_vocab, Mar_vocab, April_vocab, May_vocab, June_vocab)
+Vocab_Count
+```
+
 
 ```{r}
 ### List of popular preposition and pronouns that have no actual meaning
-prep_n_pron <- "(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|thisup|by|his|off)"
+prep_n_pron <- "(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off)"
+
+prep_n_pron <- "^(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off)$"
+
+#prep_n_pron <- c("the","a","s","at","to","of","with","in","on","and","i","you","for","is","am","are","my","it","ft","from","your","this","the","up","by","his","off")
+
+Vocab_Count %>%
+#  filter(list %in% prep_n_pron)
+   filter(grepl(prep_n_pron, list))
+
+```
+
+```{r}
 
 ### List of most popular words
 pattern <- "(official|2017|2018|ft|how|christmas|trailer|live|audio)"
