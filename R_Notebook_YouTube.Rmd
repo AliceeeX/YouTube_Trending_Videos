@@ -380,14 +380,14 @@ Vocab_Count <-
   rbind(Nov_vocab, Dec_vocab, Jan_vocab, Feb_vocab, Mar_vocab, April_vocab, May_vocab, June_vocab)
 Vocab_Count
 ```
-
+According to the table, words that do not have much meaning seem to show on top of the list, including "the", "s", "a"...
 ### Step 4: Data Visualization
 
 Next, a plot showing how top 5 popular vocabularies of each month change from November 2018 to June 2019 is plotted.
 
 ```{r}
 ### List of popular preposition and pronouns that have no actual meaning
-prep_n_pron <- "^(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off|official|video|2|day|year|we|me|t)$"
+prep_n_pron <- "^(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off|official|video|2|day|year|we|me|t|how|what|first)$"
 
 ### remove these from the list of popular words
 Vocab_Count %>%
@@ -402,92 +402,4 @@ Vocab_Count %>%
 
 ```
 
-According to the plot, the most popular words used in the videos overall is year number. Words such as 2017 and 2018 are used more often by the end of and at the beggining of each year. Moreover, in December, wehn Chirstmas is about to come, the word "Christmas" also become very common in video titles. In Feburary, which is the super bowl season, the words super and bowl often appear in the titles. In the beginning of 2018, the word "new" was used commonly, which may due to the new year just begins.
-
-```{r}
-popular_cate_US <- c("Entertainment", "Music")
-### List of most popular words
-pattern <- "(2017|2018|christmas|how|live|makeup|music|new|super|trailer|vs|what|bowl)"
-US_data %>%
-#  mutate(case = ifelse(grepl(pattern = pattern, ignore.case = TRUE, title), "With Pattern", "Without Pattern")) %>%
-  filter(grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-  mutate(case = "With Pattern") %>%
-  rbind(
-    US_data %>%
-      filter(!grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-      mutate(case = "Without Pattern")
-  ) %>%
-  group_by(trending_date, category_name, case) %>%
-  summarise(mean_views = mean(views), se = sd(views)/sqrt(n())) %>%
-  #mutate(top = mean_views + 2*se, bottom = mean_views - 2 * se) %>%
-  ggplot(aes(x = trending_date, y = mean_views, color = case)) +
-  geom_point(alpha = 0.6)+
-  geom_line(alpha = 0.6) + 
-  facet_grid(category_name ~.)
-```
-
-This plot shows that in general, entertainment videos with at least one of the vocabularies (2017, 2018, chistmas, how, music, live, makeup, music, new, super, trailer, what, vs, bowl) in the tile has higher mean views than videos without the vocaularies. This is especially obvious in December, and after middle March. In order to state with more confidence whether this difference is significant, error bars will be plotted for each day.
-
-However, for music videos, the line plots for videos with and without patterns overlap a lot. This indicates music videos with and without these vocabularies appears to be similar in most of the time. This make sense because most of these vocabularies do not seem to bring much attraction to music videos.
-
-```{r}
-popular_cate_US <- c("Entertainment", "Music")
-### List of most popular words
-pattern <- "(official|2017|2018|chistmas|how|music|new|super|trailer|video|vs|bowl)"
-US_data %>%
-  filter(grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-  mutate(case = "With Pattern") %>%
-  rbind(
-    US_data %>%
-      filter(!grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-      mutate(case = "Without Pattern")
-  ) %>%
-  group_by(trending_date, category_name, case) %>%
-  summarise(mean_views = mean(views), se = sd(views)/sqrt(n())) %>%
-  mutate(top = mean_views + 1.5* se, bottom = mean_views - 1.5 * se) %>%
-  ggplot(aes(x = trending_date, y = mean_views, color = case)) +
-  geom_point(size = 0.5) + 
-  geom_line(size = 0.5)+
-  geom_errorbar(aes(x = trending_date, ymin = bottom, ymax = top), alpha = 0.6)+
-  ylab("Views") +
-  xlab("Date")+
-  facet_grid(category_name ~.)
-```
-
-In this plot, each vertical line indicates 93.3% confidence interval bands. 
-
-It is interesting to see that although YouTube entertainment videos with the patterns have higher average views, the variance for these videos are larger than the videos without the patterns. This result in overlaping confidence intervals for most of the time, which lead to lack of significance to conclude that videos with pattern will have higher views on average. However, for some period from late April to early June, the difference bettwen views of videos with pattern in title appears to be significant different from the ones without the pattern. 
-
-Moreover, the plot for music videos agrees with observations in the previous plot. The intervals for music with and without patterns overlap for most of the time. The only period that videos with pattern has higher average views is at around end of May.
-
-# Section: Time takes for a video to become popular
-
-```{r warning=FALSE}
-### US data
-Summary_Stats <-
-  US_data %>%
-  select(video_id, publish_time, trending_date, category_name) %>%
-  mutate(publish_time = as.Date(publish_time)) %>%
-  group_by(video_id) %>%
-  mutate(first_trending_date = min(trending_date), days_to_trending = interval(publish_time, first_trending_date)/86400)
-```
-
-
-```{r}
-Summary_Stats %>%
-  group_by(category_name) %>%
-  mutate(mean_days = mean(days_to_trending), se = sd(days_to_trending)/sqrt(n())) %>%
-  mutate(top = mean_days + 2*se, bottom = mean_days - 2 * se) %>%
-  ggplot(aes(x = category_name, y = days_to_trending)) +
-  geom_bar(data = Summary_Stats, stat = "identity", alpha = 0.2 ) +
-  geom_errorbar(aes(x = category_name, ymax = top, ymin = bottom))#+
-#  ylim(c(0,90))
-
-```
-
-```{r}
-KR_data %>%
- select(category_name, trending_date, video_id) %>%
- filter(trending_date == ymd(20180328))
-
-```
+According to the plot, the most popular words used in the videos overall is year number. Words such as 2017 and 2018 are used more often by the end of and at the beggining of each year. By the end of 2017, music, trailer, and stars seem to become the most common topic among videos. Moreover, in December, wehn Chirstmas is about to come, the word "Christmas" also become very common in video titles. In the beginning of 2018, the word "new" was used commonly, which may due to the new year just begins. Then, in Feburary, when is the super bowl season, the words super and bowl often appear in the titles. It is also very interesting that more makeup videos became trending in spring 2018. 
