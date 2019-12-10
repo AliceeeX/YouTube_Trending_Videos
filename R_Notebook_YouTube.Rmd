@@ -29,6 +29,7 @@ library(DataComputing)
 library(ggplot2)
 library(rjson)
 library(rvest)
+library(party)
 ```
 
 ### Data Intake
@@ -36,59 +37,39 @@ The codes below read in data tables from csv files.
 ```{r message=FALSE, warning=FALSE}
 ### Load US videos data from USvideos.csv
 US_data <- read_csv("USvideos.csv") #full data with 40949 rows
-US_sub_data <- # small data with 10k rows
-  US_data %>%
-  head(10000)
-### Load South Korean videos data from KRvideos.csv
-KR_data <- read_csv("KRvideos.csv") #full data with 34567 rows
-KR_sub_data <- # small data with 10k rows
-  KR_data %>%
-  head(10000)
-### Read in the table that includes meaning of each category
+#US_sub_data <- # small data with 10k rows
+  #US_data %>%
+  #head(10000)
 US_category_table <- fromJSON(file = "US_category_id.json") #table of category value for US
-KR_category_table <- fromJSON(file = "KR_category_id.json") #table of category value for South Korea
 ```
 
 ### Data Table Inspection
-To start with, the main table with video information for US and South Korea is shown below:
-```{r include=FALSE, paged.print=FALSE}
+To start with, the main table with video information for US and its category names is shown below:
+```{r message=FALSE, include=FALSE, paged.print=FALSE}
 ### US videos dataset
 US_data %>%
   glimpse() #the glimpse function will present the columns down the page and rows across
-
-### South Korean videos dataset
-KR_data %>%
-  glimpse()
 
 ### US category datatable
 print("US category datatable")
 US_category_table %>%
   glimpse()
-
-### South Korea category datatable
-print("South Korea category datatable")
-KR_category_table %>%
-  glimpse()
 ```
-According to the output, there are 16 variables in total for both video datasets. This includes video id, trending date (chr), title (chr), channel title (chr), category id (dbl), publish time (dttm), tags (chr), views (dbl), likes (dbl), dislikes (dbl), comment count (dbl), thumbnail link (chr), comments disabled (lgl), ratings disabled (lgl), and video error or removed (lgl), and description (chr). 
+According to the output, there are 16 variables in total for US video datasets. This includes video id, trending date (chr), title (chr), channel title (chr), category id (dbl), publish time (dttm), tags (chr), views (dbl), likes (dbl), dislikes (dbl), comment count (dbl), thumbnail link (chr), comments disabled (lgl), ratings disabled (lgl), and video error or removed (lgl), and description (chr). 
 
-Moreover, for the category datasets, it they look a little messy. There are a 32 levels for US category datasets and 31 levels for the South Korea category dataset. Further cleaning of the data table will be conducted in later steps.
+Moreover, for the category dataset, it they look a little messy. There are a 32 levels for US category datasets. Further cleaning of the data table will be conducted in later steps.
 
 In order to decrease the dimension of the tables and prepare it for further analysis, the next step is to transform variable type and clean the data table.
 
 ### Data Preprocessing
 
-In this project, the main focus will be place on variables including video id, trending date, channel title, category id, publish time, views, liks, dislikes, and description for US data. For the South Korea videos data, only video id, trending date, category id, publish time, and views will be used in this project. Other variables will be revoved.
+In this project, the main focus will be place on variables including video id, trending date, channel title, category id, publish time, views, liks, dislikes, and description for US data. For the South Korea videos data, only video id, trending date, category id, publish time, views, and descriptions will be used in this project. Other variables will be revoved.
 
 ```{r}
 ### Select variables for the US dataset
 US_data <-
   US_data %>%
-  select(video_id, trending_date, title, channel_title, category_id, category_id, publish_time, views, likes, dislikes) 
-### Select variables for the South Korea dataset
-KR_data <-
-  KR_data %>%
-  select(video_id, trending_date, category_id, publish_time, views)
+  select(video_id, trending_date, title, channel_title, category_id, category_id, publish_time, views, likes, dislikes, description) 
 ```
 
 Notice that trending date and category id are not in the right form. Trending date should be a time variable, but is recognized as a character string. Moreover, category id should be a character string, but is recognized as a number. In the next step, variables trending date and category id are converted into the correct format.
@@ -97,10 +78,6 @@ Notice that trending date and category id are not in the right form. Trending da
 ### Convert variables for the US video dataset
 US_data <-
   US_data %>%
-  mutate(trending_date = ydm(trending_date), category_id = as.character(category_id))
-### Convert variables for the South Korea video dataset
-KR_data <-
-  KR_data %>%
   mutate(trending_date = ydm(trending_date), category_id = as.character(category_id))
 ```
 
@@ -122,31 +99,11 @@ category_name_US <-
   list(category_id = id, category_name = name) %>%
   as.data.frame()
 
-
-#Step 2: Use the KR category table fo create a table for category id&name conversion
-id_KR <- rep(c(0), 31) #ccreate a string with length 32 with values equal to 0
-name_KR <- rep(c(0), 31) #create a string with length 32 with values equal to 0
-### Use US category table to define id and their corresponding movie category name
-for (i in 1:31){
-  id_KR[i] = KR_category_table$items[[i]]$id
-  name_KR[i] = KR_category_table$items[[i]]$snippet$title
-}
-
-### Create a new table that contain the name of each category id
-category_name_KR <- 
-  list(category_id = id, category_name = name) %>%
-  as.data.frame()
-
-# Step 3: Join the US and KR video tables with the category name tables.
+# Step 2: Join the US video table with the category name table.
 ### US videos data
 US_data <-
   US_data %>%
   left_join(category_name_US)
-
-### South Korea videos data
-KR_data <-
-  KR_data %>%
-  left_join(category_name_KR)
 ```
 
 The following will show the first few rows of the data to demonstrate the data used in further sections.
@@ -154,16 +111,12 @@ The following will show the first few rows of the data to demonstrate the data u
 ### US videos data
 US_data %>%
   head()
-
-### South Korea videos data
-KR_data %>%
-  head()
 ```
 
 # Section: Most popular trending video category across time in the US and South Korea
 In this section, the most popular video category among time in the United States and South Korea is compared. 
 
-### Step 1: Most popular video categories for US and South Korea
+### Step 1: Overview of US video categories
 ```{r warning=FALSE}
 ### Most Popular Categories for US
 US_data %>%
@@ -175,93 +128,8 @@ US_data %>%
   geom_bar(stat = "count") +
   xlim(c("Entertainment", "Music", "Howto & Style", "Comedy", "People & Blogs", "News & Politics", "Science & Technology", "Film & Animation", "Sports", "Education"))+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
  # coord_polar("y", start = 0)
-
-### Most Popular Categories for South Korea
-KR_data %>%
-#  group_by(category_name) %>%
-#  summarise(count = n())%>%
-#  arrange(desc(count)) %>%
-  ggplot(aes(x = category_name, fill = category_name)) +
-  geom_bar(stat = "count") +
-  xlim(c("Entertainment", "News & Politics", "People & Blogs", "Film & Animation", "Comedy", "Music", "Gaming", "Sports", "Pets & Animals", "Howto & Style", "Education"))+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-```
-According to the two plots, among all trending videos, Entertainment videos is the most common for both countries. Moreover, Music and Howto & Style videos appears to be more common in the US while videos about news and politics as well as People & Blogs appear to be more common among trending videos on YouTube in South Korea.
-
-### Step 2: Exploratory Data Analysis
-Visualization will help to understand this result better. 
-```{r}
-### list of most popular videos
-popular_cate_US <- c("Entertainment", "Music", "Howto & Style")
-popular_cate_KR <- c("Entertainment", "People & Blogs", "News & Politics")
-
-### Define Top categories table of the US
-Top_5_category_US_count <-
-  US_data %>%
-  group_by(trending_date, category_name) %>%
-  mutate(count = n()) %>%
-  filter(category_name %in% popular_cate_US) %>%
-  mutate(country = "US")
-
-### Define Top categories table of the South Korea
-Top_5_category_KR_count <-
-  KR_data %>%  
-  group_by(trending_date, category_name) %>%
-  mutate(count = n()) %>%
-  filter(category_name %in% popular_cate_KR) %>%
-  mutate(country = "KR")
-
-### Join the two tables and transform it into wide table
-Top_5_category_count <-
-  rbind(Top_5_category_US_count, Top_5_category_KR_count)
-
-### Plot the graph
-Top_5_category_count %>%
-  ggplot(aes(x = trending_date, y = count, group = category_name)) +
-  geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))+
-  facet_grid(country ~.)
 ```
 
-This plot demonstrates the change in count for top 3 categories of each country from Nov 2018 to June 2019. However, since the daily total video counts are different, the distribution among time may not be shown accurately in this plot. In order to improve this, a daily percent plot for each category is plotted below.
-
-```{r}
-### Define Top categories table of the US
-Top_5_category_US <-
-  US_data %>%
-  group_by(trending_date) %>%
-  mutate(day_count = n()) %>%
-  group_by(trending_date, category_name) %>%
-  mutate(cate_count = n(), percent = cate_count / day_count) %>%
-  filter(category_name %in% popular_cate_US) %>%
-  mutate(country = "US")
-
-### Define Top categories table of the South Korea
-Top_5_category_KR <-
-  KR_data %>%  
-  group_by(trending_date) %>%
-  mutate(day_count = n()) %>%
-  group_by(trending_date, category_name) %>%
-  mutate(cate_count = n(), percent = cate_count / day_count) %>%
-  filter(category_name %in% popular_cate_KR) %>%
-  mutate(country = "KR")
-
-### Join the two tables and transform it into wide table
-Top_5_category <-
-  rbind(Top_5_category_US, Top_5_category_KR)
-
-### Plot the graph
-Top_5_category %>%
-  ggplot(aes(x = trending_date, y = percent, group = category_name)) +
-  geom_line(size = 0.8, alpha = 0.7, aes(color = category_name))+
-  facet_grid(country ~.)
-
-```
-
-According to the plot, the differences in most common categories of trending videos between US and South Korea seem appearant. Similar to our observation above, the plot shows that overall, the most common video categories in South Korea is Entertainment, News & Politics, and Peopl & Blogs, while in US is Entertainment, Music, and Howto & Styles. 
-
-However, it also shows the change among time. In the subplot for South Korea, the percent of count for Entertainment, News & Politics, and Peopl & Blogs started with similar values. However, by the middle of June, there is an increase trend in Entertainment videos percent count. Also, there is a decreasing pattern in People & Blog videos percent count since the beginning of June. 
-
-For the US youtube videos, the Entertainment category appears to relatively stable and take around 25% of all videos. However, the music category boosted in November, December, May, and June, which make match the time of winter and summer breaks.
 
 
 # Section: Monthly Trending "Title Phrase"
@@ -303,7 +171,7 @@ word_count <- function(variable){
 }
 ```
 
-### Step 2: Data Preprocessing
+### Step 2: Monthly Data Preprocessing
 In this step, the entire US dataset is splitted into 8 pieces from November to June
 ```{r}
 Nov <- US_data %>%
@@ -383,17 +251,29 @@ Vocab_Count
 ```
 According to the table, words that do not have much meaning seem to show on top of the list, including "the", "s", "a"...
 
-### Step 4: Data Visualization
+### Table Cleanup and Visualization
+Since some of the words in the table above do not provide any meaningful insights, they are removed in this step.
+
+```{r}
+### List of STOP words (popular preposition and pronouns that have no actual meaning)
+prep_n_pron <- "^(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off|official|video|2|day|year|we|me|t|how|what|first)$"
+Vocab_Count <- 
+  Vocab_Count %>% 
+  filter(!grepl(prep_n_pron, list))
+Vocab_Count
+```
+
+
+
+### Step 5: Monthly Visualization
 
 Next, a plot showing how top 5 popular vocabularies of each month change from November 2018 to June 2019 is plotted.
 
 ```{r}
-### List of popular preposition and pronouns that have no actual meaning
-prep_n_pron <- "^(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off|official|video|2|day|year|we|me|t|how|what|first)$"
+
 
 ### remove these from the list of popular words
 Vocab_Count %>%
-  filter(!grepl(prep_n_pron, list)) %>%
   group_by(month) %>%
   top_n(4, num) %>%
   ggplot(aes(x = month, y = num))+
@@ -405,73 +285,4 @@ Vocab_Count %>%
 ```
 
 According to the plot, the most popular words used in the videos overall is year number. Words such as 2017 and 2018 are used more often by the end of and at the beggining of each year. By the end of 2017, music, trailer, and stars seem to become the most common topic among videos. Moreover, in December, wehn Chirstmas is about to come, the word "Christmas" also become very common in video titles. In the beginning of 2018, the word "new" was used commonly, which may due to the new year just begins. Then, in Feburary, when is the super bowl season, the words super and bowl often appear in the titles. It is also very interesting that more makeup videos became trending in spring 2018. 
-
-# Section: If including popular phrases, will the videos receive higher views?
-```{r}
-popular_cate_US <- c("Entertainment", "Music")
-### List of most popular words
-pattern <- "(2017|2018|christmas|how|live|makeup|music|new|super|trailer|vs|what|bowl)"
-US_data %>%
-#  mutate(case = ifelse(grepl(pattern = pattern, ignore.case = TRUE, title), "With Pattern", "Without Pattern")) %>%
-  filter(grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-  mutate(case = "With Pattern") %>%
-  rbind(
-    US_data %>%
-      filter(!grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-      mutate(case = "Without Pattern")
-  ) %>%
-  group_by(trending_date, category_name, case) %>%
-  summarise(mean_views = mean(views), se = sd(views)/sqrt(n())) %>%
-  #mutate(top = mean_views + 2*se, bottom = mean_views - 2 * se) %>%
-  ggplot(aes(x = trending_date, y = mean_views, color = case)) +
-  geom_point(alpha = 0.6)+
-  geom_line(alpha = 0.6) + 
-  facet_grid(category_name ~.)
-```
-
-
-
-This plot shows that in general, entertainment videos with at least one of the vocabularies (2017, 2018, chistmas, how, music, live, makeup, music, new, super, trailer, what, vs, bowl) in the tile has higher mean views than videos without the vocaularies. This is especially obvious in December, and after middle March. In order to state with more confidence whether this difference is significant, error bars will be plotted for each day.
-
-However, for music videos, the line plots for videos with and without patterns overlap a lot. This indicates music videos with and without these vocabularies appears to be similar in most of the time. This make sense because most of these vocabularies do not seem to bring much attraction to music videos.
-
-```{r}
-popular_cate_US <- c("Entertainment", "Music")
-### List of most popular words
-pattern <- "(official|2017|2018|chistmas|how|music|new|super|trailer|video|vs|bowl)"
-US_data %>%
-  filter(grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-  mutate(case = "With Pattern") %>%
-  rbind(
-    US_data %>%
-      filter(!grepl(pattern = pattern, ignore.case = TRUE, title), category_name %in% popular_cate_US) %>%
-      mutate(case = "Without Pattern")
-  ) %>%
-  group_by(trending_date, category_name, case) %>%
-  summarise(mean_views = mean(views), se = sd(views)/sqrt(n())) %>%
-  mutate(top = mean_views + 1.5* se, bottom = mean_views - 1.5 * se) %>%
-  ggplot(aes(x = trending_date, y = mean_views, color = case)) +
-  geom_point(size = 0.5) + 
-  geom_line(size = 0.5)+
-  geom_errorbar(aes(x = trending_date, ymin = bottom, ymax = top), alpha = 0.6)+
-  ylab("Views") +
-  xlab("Date")#+
-  #facet_grid(category_name ~.)
-```
-
-
-In this plot, each vertical line indicates 93.3% confidence interval bands. 
-
-It is interesting to see that although YouTube entertainment videos with the patterns have higher average views, the variance for these videos are larger than the videos without the patterns. This result in overlaping confidence intervals for most of the time, which lead to lack of significance to conclude that videos with pattern will have higher views on average. However, for some period from late April to early June, the difference bettwen views of videos with pattern in title appears to be significant different from the ones without the pattern. 
-
-Moreover, the plot for music videos agrees with observations in the previous plot. The intervals for music with and without patterns overlap for most of the time. The only period that videos with pattern has higher average views is at around end of May.
-
-
-
-```{r}
-US_data %>%
-  group_by(channel_title) %>%
-  summarise(count = n(), view = sum(views), likes = sum(likes), dislikes = sum(dislikes)) %>%
-  arrange(desc(count))
-```
 
