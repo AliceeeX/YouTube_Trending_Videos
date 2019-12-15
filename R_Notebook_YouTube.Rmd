@@ -174,22 +174,25 @@ According to the plot, generally, these trending videos tend to receive more lik
 # Section: Dendrogram for similarities among categories
 In order to better understand which of these categories are more similar than others in mean views, likes, and dislikes, a dendrogram is produced.
 ```{r}
-### Create a dataframe for 
+### Create a dataframe for Machine learning
 ML_Data <- 
   US_data %>%
   select(category_name, views, likes, comment_count, dislikes) %>%
   group_by(category_name) %>%
   summarise(m_views = mean(views), m_likes = mean(likes), m_dislike = mean(dislikes))
 
+### Define row names
 rowname <- ML_Data$category_name
 
+### select variables of interest
 ML_Data <- 
   ML_Data %>%
   select(m_views, m_likes, m_dislike)
-  
+
+### calculate distance  
 cate_diff <- dist(ML_Data)
 
-
+### Machine learning step
 hc <- hclust(cate_diff)
 plot(hc, hang =-1, labels=rowname)
 ```
@@ -383,7 +386,6 @@ Cate_Vocab_Count %>%
   geom_point(aes(color = list), size = 2, alpha = 0.5)+
   geom_text_repel(aes(label=list, color = list), angle = 0, alpha = 0.7, nudge_y =1, size = 4) +
   xlim(c("Entertainment", "Music", "HowtoStyle", "Comedy", "PeopleBlogs", "NewsPolitics", "ScienceTechnology", "FilmAnimation", "Sports", "Education"))+
-  #xlim(c("Entertainment", "Music", "HowtoStyle", "Comedy", "PeopleBlogs"))+
   ylab("Count")+ 
   labs(x = "Category", title = "Most Popular Keywords by Category of Trending YouTube Videos", subtitle = "Nov 2017 - June 2018") +
   theme(legend.position = "none", axis.text.x = element_text(angle = 15))
