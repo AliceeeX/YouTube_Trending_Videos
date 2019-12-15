@@ -6,13 +6,12 @@ output:
     fig_height: 6
     fig_width: 12
 ---
+
 # Motivation
-YouTube has become one of the most popular worldwide video sharing platform nowadays. It includes videos varying from music videos to makeup tutorials, from lifestyle vlog to education videos... YouTube seem be be a hub of creativity and informations. The main purpose of this project is to explore the following questions:
-1. What is the most popular comment for the top trending videos in the United States?
-2. Is there any difference in people's favor in terms of video types among the United States and South Korea?
+YouTube has become one of the most popular worldwide video sharing platform nowadays. It includes videos varying from music videos to makeup tutorials, from lifestyle vlogs to education videos... YouTube seem be be a hub of creativity and informations. To organize these videos, they are required to be put into cateogries when uploaded. Choosing the approriate category can be important in increasing views through exposing to the right audiences. This project focuses on discovering what are the differences among YouTube video categories. This can help users to better understand these categories and make better decisions when deciding on choosing categories.
 
 # Data Source
-For this project, the dataset used is found at Kaggle published by Mitchell J, a software developer at Backbeat Technologies. The version this project based on is version 115. The following is a weblink to the Kaggle page of the dataset: [Trending YouTube Video Statistics](https://www.kaggle.com/datasnaek/youtube-new). The main dataset used in this project are *USvideos.csv*. Other supporting datasets are *KRvideos.csv*, *US_category_id.json*, *KR_category_id.json*, and 
+For this project, the dataset used is found at Kaggle published by Mitchell J, a software developer at Backbeat Technologies. The version this project based on is version 115. The following is a weblink to the Kaggle page of the dataset: [Trending YouTube Video Statistics](https://www.kaggle.com/datasnaek/youtube-new). The main dataset used in this project are *USvideos.csv*. The supporting dataset is *US_category_id.json*, which serves as a dictionary that match category id to category names.
 
 # Set Up
 
@@ -30,10 +29,12 @@ library(ggplot2)
 library(rjson)
 library(rvest)
 library(party)
+library(ggrepel)
+library(wordcloud)
 ```
 
 ### Data Intake
-The codes below read in data tables from csv files.
+The codes below read in data tables from downloaded csv files (These files can be downloaded through kaggle too).
 ```{r message=FALSE, warning=FALSE}
 ### Load US videos data from USvideos.csv
 US_data <- read_csv("USvideos.csv") #full data with 40949 rows
@@ -44,18 +45,18 @@ US_category_table <- fromJSON(file = "US_category_id.json") #table of category v
 ```
 
 ### Data Table Inspection
-To start with, the main table with video information for US and its category names is shown below:
-```{r message=FALSE, include=FALSE, paged.print=FALSE}
+To start with, the main table with video information for US and its category names are inspected:
+```{r}
 ### US videos dataset
 US_data %>%
   glimpse() #the glimpse function will present the columns down the page and rows across
 
 ### US category datatable
-print("US category datatable")
+print("US category datatable: ")
 US_category_table %>%
   glimpse()
 ```
-According to the output, there are 16 variables in total for US video datasets. This includes video id, trending date (chr), title (chr), channel title (chr), category id (dbl), publish time (dttm), tags (chr), views (dbl), likes (dbl), dislikes (dbl), comment count (dbl), thumbnail link (chr), comments disabled (lgl), ratings disabled (lgl), and video error or removed (lgl), and description (chr). 
+According to the output, there are 16 variables in total for US video datasets. They are video id, trending date (chr), title (chr), channel title (chr), category id (dbl), publish time (dttm), tags (chr), views (dbl), likes (dbl), dislikes (dbl), comment count (dbl), thumbnail link (chr), comments disabled (lgl), ratings disabled (lgl), and video error or removed (lgl), and description (chr). 
 
 Moreover, for the category dataset, it they look a little messy. There are a 32 levels for US category datasets. Further cleaning of the data table will be conducted in later steps.
 
@@ -63,13 +64,13 @@ In order to decrease the dimension of the tables and prepare it for further anal
 
 ### Data Preprocessing
 
-In this project, the main focus will be place on variables including video id, trending date, channel title, category id, publish time, views, liks, dislikes, and description for US data. For the South Korea videos data, only video id, trending date, category id, publish time, views, and descriptions will be used in this project. Other variables will be revoved.
+In this project, the main focus will be place on variables including channel title, category iddescription for US data. Other variables will be revoved.
 
 ```{r}
 ### Select variables for the US dataset
 US_data <-
   US_data %>%
-  select(video_id, trending_date, title, channel_title, category_id, category_id, publish_time, views, likes, dislikes, description) 
+  select(video_id, trending_date, title, channel_title, category_id, publish_time, views, likes, dislikes, description, comments_disabled, ratings_disabled, video_error_or_removed, comment_count) 
 ```
 
 Notice that trending date and category id are not in the right form. Trending date should be a time variable, but is recognized as a character string. Moreover, category id should be a character string, but is recognized as a number. In the next step, variables trending date and category id are converted into the correct format.
@@ -113,30 +114,91 @@ US_data %>%
   head()
 ```
 
-# Section: Most popular trending video category across time in the US and South Korea
-In this section, the most popular video category among time in the United States and South Korea is compared. 
+# Section: Numerical Differences among Youtube Video Categories
+In this section, the overall distribution of YouTube video categories are inspected. There are 16 categoriess in the November 2017 - June 2018 data. In order to see whether these categories are different, numerical caracteristics including the overall count, average views, likes and dislikes percentage are explored. In the end, a dendrogram showing category grouping is produced based on distances of these numercal variables among categories. 
 
-### Step 1: Overview of US video categories
+### Part 1: Overview of US video categories
+First, a plot for video counts in this dataset by category is displayed. 
 ```{r warning=FALSE}
 ### Most Popular Categories for US
 US_data %>%
-#  group_by(category_name) %>%
-#  summarise(count = n())%>%
-#  arrange(desc(count)) #%>%
-#  mutate(category_name = as.character(category_name), category_name = ifelse(count > 3000, category_name, "Others")) %>%
   ggplot(aes(x = category_name, fill = category_name)) +
   geom_bar(stat = "count") +
-  xlim(c("Entertainment", "Music", "Howto & Style", "Comedy", "People & Blogs", "News & Politics", "Science & Technology", "Film & Animation", "Sports", "Education"))+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
- # coord_polar("y", start = 0)
+  #xlim(c("Entertainment", "Music", "Howto & Style", "Comedy", "People & Blogs", "News & Politics", "Science & Technology", "Film & Animation", "Sports", "Education"))+ 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+labs(x = "Category", y = "Counts", title = "YouTube Video Categories", subtitle = "Nov 2017 - June 2018")+
+  theme(legend.position = "none")
 ```
+The plot above shows the categories on the x-axis and their counts on the y-axis. It is clear that an extremely large proportion of the trending videos are in the "Entertainment" category, following by "Music" and "Howto & Style". Some categories such as "Autos & Viehicles," "Nonprofits & Activism," and "Shows," and "Travels & Events" seem to have very small amount of videos identified as trending data from Nov 2017 to June 2018. The other categories in the top ten list appear to have similar amounts.
+
+### Part 2: Views Received
+Number of views is an important identifier for whether the video is popular. To better understand the difference in views received on average, the following visualization is produced.
+
+```{r}
+### Summary Statistics of views for categories
+SummaryStats <- US_data %>%
+  group_by(category_name) %>%
+  summarise(m_view = mean(views), se_view = sd(views, na.rm = TRUE)/sqrt(n())) #define means and standard error
+
+### Redefine SummaryStat dataframe to include top and bottom of 95% Confidence interval
+SummaryStats <- 
+  SummaryStats %>%
+  mutate(top = m_view + 2 * se_view,
+         bottom = m_view - 2 * se_view)
+
+### Plot the graph
+SummaryStats %>%
+  ggplot(aes(x = category_name, y = m_view)) +
+  geom_bar(stat = "identity", alpha=0.2) +
+  geom_errorbar(aes(x = category_name, 
+                    ymax = top, 
+                    ymin =bottom), width=0.5) +
+  theme(axis.text.x = element_text(angle = 30, hjust=1))+
+  labs(x = "Category", y = "Mean Views", title = "YouTube Video Categories Views Comparison", subtitle = "Nov 2017 - June 2018")
+```
+The plot above shows the mean video views received for each category. It's interesting to see that although entertainment is the category that contain the most views, its average views is in the middle range. Also, there is a lot variation for videos in the "Non-profits & Activism" category. The category
+that receive the highest views on average is the music category, which make sense because these videos usually are produced by famous singers and tend to be watched over and over again.
+
+### Part 3: Like and dislike ratio
+YouTube allow users to rate videos as "like" or "dislike" to show users attitudes toward videos. The following plot shows the percentage of likes and dislikes for each category.
+```{r}
+US_data %>%
+  select(category_name, likes, dislikes)  %>%
+  gather(key = attitude, value = count, likes, dislikes) %>%
+  ggplot(aes(x = category_name, y = count, fill = attitude))+
+  geom_bar(position = "fill", stat = "identity")+
+  theme(axis.text.x = element_text(angle = 30, hjust=1))
+```
+According to the plot, generally, these trending videos tend to receive more likes than dislikes no matter which category they fall in. However, in categories such as "News & Politics" and "Nonprofit & Activism", and "Gaming," videos receive more percent of dislikes ratings. This may due to conflicts of view points for these videos' content.
+
+# Section: Dendrogram for similarities among categories
+In order to better understand which of these categories are more similar than others in mean views, likes, and dislikes, a dendrogram is produced.
+```{r}
+### Create a dataframe for 
+ML_Data <- 
+  US_data %>%
+  select(category_name, views, likes, comment_count, dislikes) %>%
+  group_by(category_name) %>%
+  summarise(m_views = mean(views), m_likes = mean(likes), m_dislike = mean(dislikes))
+
+rowname <- ML_Data$category_name
+
+ML_Data <- 
+  ML_Data %>%
+  select(m_views, m_likes, m_dislike)
+  
+cate_diff <- dist(ML_Data)
 
 
+hc <- hclust(cate_diff)
+plot(hc, hang =-1, labels=rowname)
+```
+According to the dendrogram, "Music" appears to be a lot different from other categories. This make sense because as the previous plots shows, music videos have a lot more views on average. It is interesting that "Education" videos seem to be most similar to "News & Politics" and "Comedy" seems to be most similar to "Science & Technology" videos.
 
-# Section: Monthly Trending "Title Phrase"
+# Section: Popular "Title Phrase" among Categories
 
-YouTubers always want to get most viewers' attention by making effort in the video titles. In the following analysis, the main purpose is to understand which are the most commonly used phrases among trending YouTube videos. More importantly, how does the use of vocabulary change over time. This analysis will be based on the US dataset.
+Titles usually is a brief summary of the content of videos. For the following analysis, the main purpose is to explore the most commonly used words in titles among trending YouTube videos. More importantly, how does the use of vocabulary differ among categories.
 
-In order to analysis the montly trend, the dataset will need to be splitted into monthly pieces. Moreover, the title string should be splitted into individual words, which adds up to counts for each vocabulary. The following steps demonstrate this process.
 
 ### Step 1: Word Count Function
 
@@ -171,118 +233,162 @@ word_count <- function(variable){
 }
 ```
 
-### Step 2: Monthly Data Preprocessing
-In this step, the entire US dataset is splitted into 8 pieces from November to June
+
+### Step 2: Glimpse at overall word usage for titles
+
+In this step, the most widely used words are displayed using the wordcloud graph.
+
 ```{r}
-Nov <- US_data %>%
-  mutate(trending_date = month(trending_date)) %>%
-  filter(trending_date == 11)
-Dec <- US_data %>%
-  mutate(trending_date = month(trending_date)) %>%
-  filter(trending_date == 12)
-Jan <- US_data %>%
-  mutate(trending_date = month(trending_date)) %>%
-  filter(trending_date == 1)
-Feb <- US_data %>%
-  mutate(trending_date = month(trending_date)) %>%
-  filter(trending_date == 2)
-Mar <- US_data %>%
-  mutate(trending_date = month(trending_date)) %>%
-  filter(trending_date == 3)
-April <- US_data %>%
-  mutate(trending_date = month(trending_date)) %>%
-  filter(trending_date == 4)
-May <- US_data %>%
-  mutate(trending_date = month(trending_date)) %>%
-  filter(trending_date == 5)
-June <- US_data %>%
-  mutate(trending_date = month(trending_date)) %>%
-  filter(trending_date == 6)
+### Prepare data 
+Title <- US_data %>%
+  select(title)
+Title <- as.vector(Title)
+
+### Use wordcount function to report the word usage
+Title_overall <- word_count(Title)
+
+### Use wordcloud plot to display the distribution of commonly used words
+wordcloud(words = Title_overall$list, freq = Title_overall$num, max.words = 200, colors=brewer.pal(8, "Dark2"))
 ```
+In the plot above, the size and color of the words correspond to their popularity. As the figure shows, most of these popular words are prepositions and nouns that do not have much meaning. For example, "the," "a," video, and "official" cannot tell much information about the titles. Hence, a list of stop words that do not have much meaning are created and help cleaning the list of words.
 
-### Step 3: Word Count for Each Month
-Then, the vocab function is applied to each month's data. The result will be the trending vocab in video titles.
-```{r}
-Nov_title <- as.vector(Nov$title)
-Nov_vocab <- word_count(Nov_title) %>%
-  arrange(desc(num)) %>%
-  mutate(month = "Nov")
-
-Dec_title <- as.vector(Dec$title)
-Dec_vocab <- word_count(Dec_title) %>%
-  arrange(desc(num)) %>%
-  mutate(month = "Dec")
-
-Jan_title <- as.vector(Jan$title)
-Jan_vocab <- word_count(Jan_title) %>%
-  arrange(desc(num))%>%
-  mutate(month = "Jan")
-
-Feb_title <- as.vector(Feb$title)
-Feb_vocab <- word_count(Feb_title) %>%
-  arrange(desc(num))%>%
-  mutate(month = "Feb")
-
-Mar_title <- as.vector(Mar$title)
-Mar_vocab <- word_count(Mar_title) %>%
-  arrange(desc(num))%>%
-  mutate(month = "Mar")
-
-April_title <- as.vector(April$title)
-April_vocab <- word_count(April_title) %>%
-  arrange(desc(num))%>%
-  mutate(month = "April")
-
-May_title <- as.vector(May$title)
-May_vocab <- word_count(May_title) %>%
-  arrange(desc(num))%>%
-  mutate(month = "May")
-
-June_title <- as.vector(June$title)
-June_vocab <- word_count(June_title) %>%
-  arrange(desc(num))%>%
-  mutate(month = "June")
-```
-These tables are binded together for further analysis.
-```{r}
-Vocab_Count <-
-  rbind(Nov_vocab, Dec_vocab, Jan_vocab, Feb_vocab, Mar_vocab, April_vocab, May_vocab, June_vocab)
-Vocab_Count
-```
-According to the table, words that do not have much meaning seem to show on top of the list, including "the", "s", "a"...
-
-### Table Cleanup and Visualization
-Since some of the words in the table above do not provide any meaningful insights, they are removed in this step.
-
+### Step 3: Clean up the key words list using stop words
 ```{r}
 ### List of STOP words (popular preposition and pronouns that have no actual meaning)
-prep_n_pron <- "^(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off|official|video|2|day|year|we|me|t|how|what|first)$"
-Vocab_Count <- 
-  Vocab_Count %>% 
-  filter(!grepl(prep_n_pron, list))
-Vocab_Count
+prep_n_pron <- "^(the|a|s|at|to|of|with|in|on|and|i|you|for|is|am|are|my|it|ft|from|your|this|the|up|by|his|off|official|video|2|day|year|we|me|t|how|what|first|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z|she|her|him|they|them|an|do|don|our|that|he|if|or|make|can|people|should|could|does|so|being|be|about|when|get|have|these|making|not|which|much|etc|every|things|let|just|as|new|vs|out|why|all|were|no)$"
+number <- "(0|1|2|3|4|5|6|7|8|9)"
+Title_nostop <- Title_overall %>%
+  filter(!grepl(prep_n_pron, list), !grepl(number, list))
+
+wordcloud(words = Title_nostop$list, freq = Title_nostop$num, max.words = 200, colors=brewer.pal(8, "Dark2"))
 ```
 
+After removing the nouns and prepositions that are meaningless, the cloud map now provides more information. "Trailer" appears to be the most popular key word, following by "audio," "challenge", "makeup", and more.
 
 
-### Step 5: Monthly Visualization
+### Step 4: Define the Top 10 Categories
+Because of computation complexity, only the key words for the top 10 categories in number of videos are displayed. In the following step, a dataframe is defined for each of these categories and the word count function is applied on them.
+```{r}
+### Use filter function to define dataframe for each of the top 10 categories
+Entertainment <- US_data %>%
+  filter(category_name == "Entertainment")
+
+Music <- US_data %>%
+  filter(category_name == "Music")
+
+HowtoStyle <- US_data %>%
+  filter(category_name == "Howto & Style")
+
+Comedy <- US_data %>%
+  filter(category_name == "Comedy")
+
+PeopleBlogs <- US_data %>%
+  filter(category_name == "People & Blogs")
+
+NewsPolitics <- US_data %>%
+  filter(category_name == "News & Politics")
+
+ScienceTechnology <- US_data %>%
+  filter(category_name == "Science & Technology")
+
+FilmAnimation <- US_data %>%
+  filter(category_name == "Film & Animation")
+
+Sports <- US_data %>%
+  filter(category_name == "Sports")
+
+Education <- US_data %>%
+  filter(category_name == "Education")
+
+### Convert the titles into vectors and then apply the word functions to these categories
+Entertainment_title <- as.vector(Entertainment$title)
+Entertainment_vocab <- word_count(Entertainment_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "Entertainment")
+
+Music_title <- as.vector(Music$title)
+Music_vocab <- word_count(Music_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "Music")
+
+HowtoStyle_title <- as.vector(HowtoStyle$title)
+HowtoStyle_vocab <- word_count(HowtoStyle_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "HowtoStyle")
+
+Comedy_title <- as.vector(Comedy$title)
+Comedy_vocab <- word_count(Comedy_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "Comedy")
+
+PeopleBlogs_title <- as.vector(PeopleBlogs$title)
+PeopleBlogs_vocab <- word_count(PeopleBlogs_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "PeopleBlogs")
+
+NewsPolitics_title <- as.vector(NewsPolitics$title)
+NewsPolitics_vocab <- word_count(NewsPolitics_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "NewsPolitics")
+
+ScienceTechnology_title <- as.vector(ScienceTechnology$title)
+ScienceTechnology_vocab <- word_count(ScienceTechnology_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "ScienceTechnology")
+
+FilmAnimation_title <- as.vector(FilmAnimation$title)
+FilmAnimation_vocab <- word_count(FilmAnimation_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "FilmAnimation")
+
+Sports_title <- as.vector(Sports$title)
+Sports_vocab <- word_count(Sports_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "Sports")
+
+Education_title <- as.vector(Education$title)
+Education_vocab <- word_count(Education_title) %>%
+  arrange(desc(num)) %>%
+  mutate(category_name = "Education")
+```
+
+In order to combine the results for these categories, they are combined into one dataset.
+```{r}
+### Define a vocabulary count dataset that includes information for all of top 10 categories
+Cate_Vocab_Count <-
+  rbind(Entertainment_vocab, Music_vocab, HowtoStyle_vocab, Comedy_vocab, PeopleBlogs_vocab, NewsPolitics_vocab, ScienceTechnology_vocab, FilmAnimation_vocab, Sports_vocab, Education_vocab)
+```
+
+Then, as we did for the previous plot, some meaningless words are removed from this dataset to provide better insights.
+```{r}
+Cate_Vocab_Count <- 
+  Cate_Vocab_Count %>% 
+  filter(!grepl(prep_n_pron, list), !grepl(number, list), list != "") %>% ### use filter function to get rid of meaningless words and blanks
+  group_by(category_name) %>%
+  mutate(ratio = num / max(num)) %>%
+  filter(ratio >= 0.25)
+Cate_Vocab_Count
+```
+
 
 Next, a plot showing how top 5 popular vocabularies of each month change from November 2018 to June 2019 is plotted.
 
 ```{r}
-
-
 ### remove these from the list of popular words
-Vocab_Count %>%
-  group_by(month) %>%
-  top_n(4, num) %>%
-  ggplot(aes(x = month, y = num))+
-  #geom_point(aes(color = list), size = 2, alpha = 0.5)+
-  geom_text(aes(label=list, color = list), angle = 45, alpha = 0.8, nudge_y =1) +
-  xlim(c("Nov", "Dec", "Jan", "Feb", "Mar", "April", "May", "June"))+
-  ylab("count")
-
+Cate_Vocab_Count %>%
+  na.omit() %>%
+  group_by(category_name) %>%
+  top_n(5, num) %>%
+  ggplot(aes(x = category_name, y = num))+
+  geom_point(aes(color = list), size = 2, alpha = 0.5)+
+  geom_text_repel(aes(label=list, color = list), angle = 0, alpha = 0.7, nudge_y =1, size = 4) +
+  xlim(c("Entertainment", "Music", "HowtoStyle", "Comedy", "PeopleBlogs", "NewsPolitics", "ScienceTechnology", "FilmAnimation", "Sports", "Education"))+
+  #xlim(c("Entertainment", "Music", "HowtoStyle", "Comedy", "PeopleBlogs"))+
+  ylab("Count")+ 
+  labs(x = "Category", title = "Most Popular Keywords by Category of Trending YouTube Videos", subtitle = "Nov 2017 - June 2018") +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 15))
 ```
+According to the plot above, the most often used words for each category appear to representitive for each video category. For example, in the "Howto & Style" category, videos titles usually contain makeup, cate, beauty, face, and tutorial. This make sense because these videos most likely are about makeup tutorials or teach people how to make cake. It is interesting to see that for some categories such as "Entertainment" and "Film & Animation," the key words appear to be overlapping. Words such as trailer and hd are common in both categories. 
 
-According to the plot, the most popular words used in the videos overall is year number. Words such as 2017 and 2018 are used more often by the end of and at the beggining of each year. By the end of 2017, music, trailer, and stars seem to become the most common topic among videos. Moreover, in December, wehn Chirstmas is about to come, the word "Christmas" also become very common in video titles. In the beginning of 2018, the word "new" was used commonly, which may due to the new year just begins. Then, in Feburary, when is the super bowl season, the words super and bowl often appear in the titles. It is also very interesting that more makeup videos became trending in spring 2018. 
-
+# Conclusion
+The 16 trending video categories from Nov 2017 to June 2018 appear to be different in views, ratio of liking, and key words in titles. These differences are consistent with the characteristics of videos in these sixteen categories. Keywords in titles, among other variables, provide the most meaningful explainations. By comparing the key words with the commonly used words in the categories can efficiently help users narrowing down to the most suitable category. Further exploration on how to use key words in titles to categories YouTube videos can be conducted in future analysis.
