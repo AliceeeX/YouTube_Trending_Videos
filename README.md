@@ -1,2 +1,3 @@
 # YouTube_Trending_Videos
-This repo is for STAT 184 project.
+### Motivation
+YouTube has become one of the most popular worldwide video sharing platform nowadays. It includes videos varying from music videos to makeup tutorials, from lifestyle vlogs to education videos... YouTube seem be be a hub of creativity and informations. To organize these videos, they are required to be put into cateogries when uploaded. Choosing the approriate category can be important in increasing views through exposing to the right audiences. This project focuses on discovering what are the differences among YouTube video categories. This can help users to better understand these categories and make better decisions when deciding on choosing categories.
